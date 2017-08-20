@@ -181,6 +181,7 @@ static void init_registry (lua_State *L, global_State *g) {
 /*
 ** open parts of the state that may cause memory-allocation errors
 */
+// 初始化数据栈，注册表，字符串池，元表字符串，词法分析字符串，内存错误信息
 static void f_luaopen (lua_State *L, void *ud) {
   global_State *g = G(L);
   UNUSED(ud);

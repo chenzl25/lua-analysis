@@ -1,1 +1,7 @@
 build
+Win32
+etc
+liblua.dir
+lua.dir
+luac.dir
+wlua.dir

@@ -19,6 +19,7 @@
 /*
 ** Extra tags for non-values
 */
+// 扩展的tag
 #define LUA_TPROTO	LUA_NUMTAGS
 #define LUA_TUPVAL	(LUA_NUMTAGS+1)
 #define LUA_TDEADKEY	(LUA_NUMTAGS+2)
@@ -26,6 +27,7 @@
 /*
 ** number of all possible tags (including LUA_TNONE but excluding DEADKEY)
 */
+// 总共tag的数目
 #define LUA_TOTALTAGS	(LUA_TUPVAL+2)
 
 
@@ -35,7 +37,12 @@
 ** bits 4-5: variant bits
 ** bit 6: whether value is collectable
 */
+// lua中有带tag的Value,tag的bit使用如下:
+// 0-3位代表真实的tag，类比于主类型
+// 4-5位代表变种的tag，类比于子类型
+// 6位代表该Value可以回收
 
+// 变种的位4-5
 #define VARBITS		(3 << 4)
 
 
@@ -67,6 +74,7 @@
 /*
 ** Union of all collectable objects
 */
+// 所有可回收对象的联合体
 typedef union GCObject GCObject;
 
 
@@ -74,6 +82,10 @@ typedef union GCObject GCObject;
 ** Common Header for all collectable objects (in macro form, to be
 ** included in other objects)
 */
+// 可回收对象的头部:
+// 指向下个对象的next指针
+// 代表对象类型的tag
+// 用于垃圾回收的标志位
 #define CommonHeader	GCObject *next; lu_byte tt; lu_byte marked
 
 
@@ -89,6 +101,7 @@ typedef struct GCheader {
 /*
 ** Union of all Lua values
 */
+// lua的所有values都包括了，分为可回收和不可回收
 typedef union Value Value;
 
 
@@ -100,34 +113,41 @@ typedef union Value Value;
 ** Tagged Values. This is the basic representation of values in Lua,
 ** an actual value plus a tag with its type.
 */
-
+// 带tag的value，tag放在value后面
 #define TValuefields	Value value_; int tt_
 
 typedef struct lua_TValue TValue;
 
 
 /* macro defining a nil value */
+// 定义nil的常量，对应于Value+tag
 #define NILCONSTANT	{NULL}, LUA_TNIL
 
-
+// 获取TValue的value_,即时不包括tag的部分
 #define val_(o)		((o)->value_)
+// 获取TValue中number类型的值
 #define num_(o)		(val_(o).n)
 
 
 /* raw type tag of a TValue */
+// 获取TValue的tag值
 #define rttype(o)	((o)->tt_)
 
 /* tag with no variants (bits 0-3) */
+// 非变种标签
 #define novariant(x)	((x) & 0x0F)
 
 /* type tag of a TValue (bits 0-3 for tags + variant bits 4-5) */
+// 变种标签加基本类型
 #define ttype(o)	(rttype(o) & 0x3F)
 
 /* type tag of a TValue with no variants (bits 0-3) */
+// 获取TValue的tag的基本类型
 #define ttypenv(o)	(novariant(rttype(o)))
 
 
 /* Macros to test type */
+// 判断TValue属于那类tag的宏
 #define checktag(o,t)		(rttype(o) == (t))
 #define checktype(o,t)		(ttypenv(o) == (t))
 #define ttisnumber(o)		checktag((o), LUA_TNUMBER)
@@ -150,6 +170,7 @@ typedef struct lua_TValue TValue;
 #define ttisequal(o1,o2)	(rttype(o1) == rttype(o2))
 
 /* Macros to access values */
+// 检查类型并获取对应的值，check_exp可以条件编译
 #define nvalue(o)	check_exp(ttisnumber(o), num_(o))
 #define gcvalue(o)	check_exp(iscollectable(o), val_(o).gc)
 #define pvalue(o)	check_exp(ttislightuserdata(o), val_(o).p)
@@ -182,6 +203,8 @@ typedef struct lua_TValue TValue;
 
 
 /* Macros to set values */
+// 用于设置TValue的宏
+// 对于可回收对象，需要检查设置的对象存活
 #define settt_(o,t)	((o)->tt_=(t))
 
 #define setnvalue(obj,x) \
@@ -384,7 +407,8 @@ typedef struct lua_TValue TValue;
 ** =======================================================
 */
 
-
+// lua的Value，不带tag
+// 分为可回收和不可回收部分
 union Value {
   GCObject *gc;    /* collectable objects */
   void *p;         /* light userdata */
@@ -393,12 +417,12 @@ union Value {
   numfield         /* numbers */
 };
 
-
+// 带tag的Value
 struct lua_TValue {
   TValuefields;
 };
 
-
+// 栈上的指针都指向TValue
 typedef TValue *StkId;  /* index to stack elements */
 
 
@@ -407,6 +431,9 @@ typedef TValue *StkId;  /* index to stack elements */
 /*
 ** Header for string value; string bytes follow the end of this structure
 */
+// lua字符串类
+// 包含hash值和长度
+// extra字段对于短字符串来说是保留的，而长字符串则是代表是否进行了hash
 typedef union TString {
   L_Umaxalign dummy;  /* ensures maximum alignment for strings */
   struct {
@@ -419,9 +446,11 @@ typedef union TString {
 
 
 /* get the actual string (array of bytes) from a TString */
+// 获取真正的字符串，+1代表偏移TString结构体的大小，真正的字符串在后面
 #define getstr(ts)	cast(const char *, (ts) + 1)
 
 /* get the actual string (array of bytes) from a Lua value */
+// 从TVaule到真正的字符串
 #define svalue(o)       getstr(rawtsvalue(o))
 
 
@@ -541,7 +570,9 @@ typedef union Closure {
 /*
 ** Tables
 */
-
+// 表的Key类
+// union有两个变量，事实上tvk就是nk中的TValuefields
+// next用于表中的Node链表连接
 typedef union TKey {
   struct {
     TValuefields;
@@ -550,13 +581,21 @@ typedef union TKey {
   TValue tvk;
 } TKey;
 
-
+// 表中的Node结构:Value和Key，其中Key包括了next指针
 typedef struct Node {
   TValue i_val;
   TKey i_key;
 } Node;
 
-
+// lua的表类
+// flags用于常用元方法是否存在的缓存
+// lsizenode代表node数组的大小，取log2,所以一个字节就可以存下，也表明了node数组的大小位2的幂
+// sizearray代表array数组的大小
+// array:类型位TValue，下标位整数
+// node:类型位Node，用作哈希表(闭散列)的实现，避免内存碎片
+// lastfree:该指针前面的为空闲的Node，指向node的某一位置
+// metatable:元表
+// gclist:用于垃圾回收
 typedef struct Table {
   CommonHeader;
   lu_byte flags;  /* 1<<p means tagmethod(p) is not present */
@@ -574,20 +613,23 @@ typedef struct Table {
 /*
 ** `module' operation for hashing (size is always a power of 2)
 */
+// 取模函数，并且size是2的幂
 #define lmod(s,size) \
 	(check_exp((size&(size-1))==0, (cast(int, (s) & ((size)-1)))))
 
-
+// 2^x
 #define twoto(x)	(1<<(x))
+// node数组的size计算是要移位的。(时间换空间)
 #define sizenode(t)	(twoto((t)->lsizenode))
 
 
 /*
 ** (address of) a fixed nil value
 */
+// nil是全局变量只有一个，该宏返回其地址
 #define luaO_nilobject		(&luaO_nilobject_)
 
-
+// LUAU_DDEC 类似于extern, 在luaconf.h有gcc提供优化的版本
 LUAI_DDEC const TValue luaO_nilobject_;
 
 
