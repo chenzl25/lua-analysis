@@ -209,6 +209,10 @@ void luaC_checkupvalcolor (global_State *g, UpVal *uv) {
 ** it to '*list'. 'offset' tells how many bytes to allocate before the
 ** object itself (used only by states).
 */
+// 根据给定的tag，size，list来生成一个GCObject
+// 其中marked要标为白色
+// 并将对象放入list中(如果参数不存在则放到gstate的allgc中)
+// PS: luaM_newobject中传入的tag在生成新对象中实际上是没用的
 GCObject *luaC_newobj (lua_State *L, int tt, size_t sz, GCObject **list,
                        int offset) {
   global_State *g = G(L);

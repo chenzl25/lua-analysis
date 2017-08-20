@@ -31,6 +31,7 @@
 /*
 ** equality for short strings, which are always internalized
 */
+// 用于比较短字符串，直接比较内存地址
 #define eqshrstr(a,b)	check_exp((a)->tsv.tt == LUA_TSHRSTR, (a) == (b))
 
 

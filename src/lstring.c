@@ -30,6 +30,7 @@
 /*
 ** equality for long strings
 */
+// 长字符串比较，用memcmp
 int luaS_eqlngstr (TString *a, TString *b) {
   size_t len = a->tsv.len;
   lua_assert(a->tsv.tt == LUA_TLNGSTR && b->tsv.tt == LUA_TLNGSTR);
@@ -42,12 +43,13 @@ int luaS_eqlngstr (TString *a, TString *b) {
 /*
 ** equality for strings
 */
+// 比较两个字符串，长短字符串分开比较
 int luaS_eqstr (TString *a, TString *b) {
   return (a->tsv.tt == b->tsv.tt) &&
          (a->tsv.tt == LUA_TSHRSTR ? eqshrstr(a, b) : luaS_eqlngstr(a, b));
 }
 
-
+// 字符串的哈希函数，传入字符串和随机种子
 unsigned int luaS_hash (const char *str, size_t l, unsigned int seed) {
   unsigned int h = seed ^ cast(unsigned int, l);
   size_t l1;
@@ -61,6 +63,9 @@ unsigned int luaS_hash (const char *str, size_t l, unsigned int seed) {
 /*
 ** resizes the string table
 */
+// 短字符串池的resize(增大或缩小)
+// 不能在GC扫描阶段resize(因为这时候GC会遍历这个表，剔除dead的)
+// rehash的过程中有调用resetoldbit，是取消老生代的标志
 void luaS_resize (lua_State *L, int newsize) {
   int i;
   stringtable *tb = &G(L)->strt;
@@ -95,6 +100,9 @@ void luaS_resize (lua_State *L, int newsize) {
 /*
 ** creates a new string object
 */
+// 申请内存，创建字符串
+// 可以看出TString所需要的内存就是和它顶上的GCObject的union无关的，无浪费
+// 注意字符串最后一位时'\0'与C字符串兼容
 static TString *createstrobj (lua_State *L, const char *str, size_t l,
                               int tag, unsigned int h, GCObject **list) {
   TString *ts;
@@ -113,6 +121,8 @@ static TString *createstrobj (lua_State *L, const char *str, size_t l,
 /*
 ** creates a new short string, inserting it into string table
 */
+// 创建短字符串并插入短字符串池
+// 其中当池中个数大于表的桶个数时，扩容
 static TString *newshrstr (lua_State *L, const char *str, size_t l,
                                        unsigned int h) {
   GCObject **list;  /* (pointer to) list where it will be inserted */
@@ -130,6 +140,7 @@ static TString *newshrstr (lua_State *L, const char *str, size_t l,
 /*
 ** checks whether short string exists and reuses it or creates a new one
 */
+// 先在段字符串池中查找是否存在，若存在返回，否则创建新字符串
 static TString *internshrstr (lua_State *L, const char *str, size_t l) {
   GCObject *o;
   global_State *g = G(L);

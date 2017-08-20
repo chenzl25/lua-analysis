@@ -51,11 +51,13 @@ struct lua_longjmp;  /* defined in ldo.c */
 
 
 /* kinds of Garbage Collection */
+// 垃圾回收的种类
 #define KGC_NORMAL	0
 #define KGC_EMERGENCY	1	/* gc was forced by an allocation failure */
 #define KGC_GEN		2	/* generational collection */
 
 
+// 字符串表，用于存放相同的短字符串
 typedef struct stringtable {
   GCObject **hash;
   lu_int32 nuse;  /* number of elements */
