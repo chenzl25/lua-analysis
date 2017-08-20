@@ -21,6 +21,9 @@
 ** +1 avoids warnings of "comparison has constant result";
 ** cast to 'void' avoids warnings of "value unused".
 */
+// 一组宏，用于进一步抽象内存的管理，包括对象在，数组，可变长数组
+// 其中利用宏来进行常量折叠
+// 最底层调用luaM_realloc_
 #define luaM_reallocv(L,b,on,n,e) \
   (cast(void, \
      (cast(size_t, (n)+1) > MAX_SIZET/(e)) ? (luaM_toobig(L), 0) : 0), \

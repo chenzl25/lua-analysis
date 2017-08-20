@@ -915,7 +915,8 @@ LUALIB_API const char *luaL_gsub (lua_State *L, const char *s, const char *p,
   return lua_tostring(L, -1);
 }
 
-
+// 默认的内存管理器
+// ud代表堆，ptr代表指针，osize代表旧大小，nsize代表新大小
 static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize) {
   (void)ud; (void)osize;  /* not used */
   if (nsize == 0) {
@@ -926,14 +927,16 @@ static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize) {
     return realloc(ptr, nsize);
 }
 
-
+// 在配置文件中定义了luai_writestringerror为c中的fprintf写向stderr
 static int panic (lua_State *L) {
   luai_writestringerror("PANIC: unprotected error in call to Lua API (%s)\n",
                    lua_tostring(L, -1));
   return 0;  /* return to Lua to abort */
 }
 
-
+// 创建lua_State的库函数
+// 内部通过调用lua_newstate实现
+// 顺便设置panic函数
 LUALIB_API lua_State *luaL_newstate (void) {
   lua_State *L = lua_newstate(l_alloc, NULL);
   if (L) lua_atpanic(L, &panic);

@@ -56,6 +56,7 @@
 /*
 ** thread state + extra space
 */
+// LX为额外空间加上线程状态空间
 typedef struct LX {
 #if defined(LUAI_EXTRASPACE)
   char buff[LUAI_EXTRASPACE];
@@ -73,7 +74,7 @@ typedef struct LG {
 } LG;
 
 
-
+// 这个宏目的是将L转到LX，其中要偏移extra的空间
 #define fromstate(L)	(cast(LX *, cast(lu_byte *, (L)) - offsetof(LX, l)))
 
 
@@ -267,6 +268,7 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   int i;
   lua_State *L;
   global_State *g;
+  // 这里是以LG为结构体申请内存的，所以G也在里面
   LG *l = cast(LG *, (*f)(ud, NULL, LUA_TTHREAD, sizeof(LG)));
   if (l == NULL) return NULL;
   L = &l->l.l;
@@ -280,6 +282,7 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   g->frealloc = f;
   g->ud = ud;
   g->mainthread = L;
+  // 初始化随机种子，用于后期hash使用，防止网络针对lua虚拟机的攻击
   g->seed = makeseed(L);
   g->uvhead.u.l.prev = &g->uvhead;
   g->uvhead.u.l.next = &g->uvhead;
@@ -305,6 +308,7 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   g->gcmajorinc = LUAI_GCMAJOR;
   g->gcstepmul = LUAI_GCMUL;
   for (i=0; i < LUA_NUMTAGS; i++) g->mt[i] = NULL;
+  // 接下来到涉及内存分配的初始化，需要在try catch下进行
   if (luaD_rawrunprotected(L, f_luaopen, NULL) != LUA_OK) {
     /* memory allocation error: free partial state */
     close_state(L);

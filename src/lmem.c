@@ -39,10 +39,10 @@
 */
 
 
-
+// lua申请内存数组最小长度
 #define MINSIZEARRAY	4
 
-
+// 数组大小以两倍增长
 void *luaM_growaux_ (lua_State *L, void *block, int *size, size_t size_elems,
                      int limit, const char *what) {
   void *newblock;
@@ -62,7 +62,7 @@ void *luaM_growaux_ (lua_State *L, void *block, int *size, size_t size_elems,
   return newblock;
 }
 
-
+// 运行时内存申请过大错误
 l_noret luaM_toobig (lua_State *L) {
   luaG_runerror(L, "memory allocation error: block too big");
 }
@@ -72,27 +72,35 @@ l_noret luaM_toobig (lua_State *L) {
 /*
 ** generic allocation routine.
 */
+
+// 最底层的lua内存分配函数
+// 其中涉及到垃圾回收
 void *luaM_realloc_ (lua_State *L, void *block, size_t osize, size_t nsize) {
   void *newblock;
   global_State *g = G(L);
   size_t realosize = (block) ? osize : 0;
   lua_assert((realosize == 0) == (block == NULL));
-#if defined(HARDMEMTESTS)
+#if defined(HARDMEMTESTS) // 如果是HARDMEMTESTS模式那么有机会进行GC
   if (nsize > realosize && g->gcrunning)
     luaC_fullgc(L, 1);  /* force a GC whenever possible */
 #endif
+  // 尝试分配内存
   newblock = (*g->frealloc)(g->ud, block, osize, nsize);
   if (newblock == NULL && nsize > 0) {
     api_check(L, nsize > realosize,
                  "realloc cannot fail when shrinking a block");
+  	// 如果失败，那么肯定是申请内存或者扩大内存
+  	// 进行一次垃圾回收再尝试分配
     if (g->gcrunning) {
       luaC_fullgc(L, 1);  /* try to free some memory... */
       newblock = (*g->frealloc)(g->ud, block, osize, nsize);  /* try again */
     }
+	// 如果依然申请失败，抛出异常
     if (newblock == NULL)
       luaD_throw(L, LUA_ERRMEM);
   }
   lua_assert((nsize == 0) == (newblock == NULL));
+  // 记录相关gc数据，并返回
   g->GCdebt = (g->GCdebt + nsize) - realosize;
   return newblock;
 }

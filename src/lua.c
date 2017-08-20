@@ -476,7 +476,8 @@ static int pmain (lua_State *L) {
   return 1;
 }
 
-
+// lua解析器的入口
+// 创建 lua_State,运行pmain函数
 int main (int argc, char **argv) {
   int status, result;
   lua_State *L = luaL_newstate();  /* create state */
