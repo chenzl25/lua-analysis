@@ -457,6 +457,7 @@ typedef union TString {
 /*
 ** Header for userdata; memory area follows the end of this structure
 */
+// Udata的头部类，和TString很像，但不需要加'\0'
 typedef union Udata {
   L_Umaxalign dummy;  /* ensures maximum alignment for `local' udata */
   struct {

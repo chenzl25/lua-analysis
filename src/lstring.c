@@ -182,7 +182,7 @@ TString *luaS_new (lua_State *L, const char *str) {
   return luaS_newlstr(L, str, strlen(str));
 }
 
-
+// 创建一个Udata，简单地申请足够的内存
 Udata *luaS_newudata (lua_State *L, size_t s, Table *e) {
   Udata *u;
   if (s > MAX_SIZET - sizeof(Udata))
