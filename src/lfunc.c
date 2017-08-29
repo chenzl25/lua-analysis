@@ -19,14 +19,14 @@
 #include "lstate.h"
 
 
-
+// 新建一个Cclosure
 Closure *luaF_newCclosure (lua_State *L, int n) {
   Closure *c = &luaC_newobj(L, LUA_TCCL, sizeCclosure(n), NULL, 0)->cl;
   c->c.nupvalues = cast_byte(n);
   return c;
 }
 
-
+// 新建一个Lclosure
 Closure *luaF_newLclosure (lua_State *L, int n) {
   Closure *c = &luaC_newobj(L, LUA_TLCL, sizeLclosure(n), NULL, 0)->cl;
   c->l.p = NULL;
@@ -35,7 +35,7 @@ Closure *luaF_newLclosure (lua_State *L, int n) {
   return c;
 }
 
-
+// 新建一个upvalue，v暂且指向value
 UpVal *luaF_newupval (lua_State *L) {
   UpVal *uv = &luaC_newobj(L, LUA_TUPVAL, sizeof(UpVal), NULL, 0)->uv;
   uv->v = &uv->u.value;
@@ -43,7 +43,7 @@ UpVal *luaF_newupval (lua_State *L) {
   return uv;
 }
 
-
+// 在L的openupval中寻找在栈上level位置的upval，如果没有则新建返回
 UpVal *luaF_findupval (lua_State *L, StkId level) {
   global_State *g = G(L);
   GCObject **pp = &L->openupval;
@@ -71,21 +71,22 @@ UpVal *luaF_findupval (lua_State *L, StkId level) {
   return uv;
 }
 
-
+// close一个upval时候在L上的openupval上解链
 static void unlinkupval (UpVal *uv) {
   lua_assert(uv->u.l.next->u.l.prev == uv && uv->u.l.prev->u.l.next == uv);
   uv->u.l.next->u.l.prev = uv->u.l.prev;  /* remove from `uvhead' list */
   uv->u.l.prev->u.l.next = uv->u.l.next;
 }
 
-
+// free掉一个upval，如果是open则要先解链
 void luaF_freeupval (lua_State *L, UpVal *uv) {
   if (uv->v != &uv->u.value)  /* is it open? */
     unlinkupval(uv);  /* remove from open list */
   luaM_free(L, uv);  /* free upvalue */
 }
 
-
+// 比level要大的openupval都要close
+// upval从openupval中转移到g->allgc中
 void luaF_close (lua_State *L, StkId level) {
   UpVal *uv;
   global_State *g = G(L);

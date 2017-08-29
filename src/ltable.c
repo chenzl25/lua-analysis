@@ -18,6 +18,11 @@
 ** Hence even when the load factor reaches 100%, performance remains good.
 */
 
+// lua的table实现
+// table为了效率，把实现分为array和hash两部分
+// array的大小为n，0到n之间的slot至少被使用了一半以上
+// hash部分保证main position是插入的元素自己的或其它已经插入项的
+
 #include <string.h>
 
 #define ltable_c
@@ -47,9 +52,10 @@
 
 #define MAXASIZE	(1 << MAXBITS)
 
-
+// 根据n取模于table的hash大小获取hash部分的node
 #define hashpow2(t,n)		(gnode(t, lmod((n), sizenode(t))))
 
+// 获取hash字符串和布尔值的node
 #define hashstr(t,str)		hashpow2(t, (str)->tsv.hash)
 #define hashboolean(t,p)	hashpow2(t, p)
 
@@ -58,9 +64,10 @@
 ** for some types, it is better to avoid modulus by power of 2, as
 ** they tend to have many 2 factors.
 */
+// 对于一些类型，最好防止去模2的幂，因为它们有很多2因子
 #define hashmod(t,n)	(gnode(t, ((n) % ((sizenode(t)-1)|1))))
 
-
+// 例如哈希指针，指针可能还有很多2的因子，那么我们用hashmod来获取其node位置，防止过多碰撞
 #define hashpointer(t,p)	hashmod(t, IntPoint(p))
 
 
@@ -68,6 +75,7 @@
 
 #define isdummy(n)		((n) == dummynode)
 
+// 全局null变量
 static const Node dummynode_ = {
   {NILCONSTANT},  /* value */
   {{NILCONSTANT, NULL}}  /* key */
@@ -77,6 +85,7 @@ static const Node dummynode_ = {
 /*
 ** hash for lua_Numbers
 */
+// hash lua的Number
 static Node *hashnum (const Table *t, lua_Number n) {
   int i;
   luai_hashnum(i, n);
@@ -94,6 +103,9 @@ static Node *hashnum (const Table *t, lua_Number n) {
 ** returns the `main' position of an element in a table (that is, the index
 ** of its hash value)
 */
+// 获取一个key在table中的mainposition
+// 根据类型分别使用不同的hash方法来获取对应table的node位置
+// 其中长string的hash的惰性求值在这里可以体现
 static Node *mainposition (const Table *t, const TValue *key) {
   switch (ttype(key)) {
     case LUA_TNUMBER:
@@ -124,6 +136,7 @@ static Node *mainposition (const Table *t, const TValue *key) {
 ** returns the index for `key' if `key' is an appropriate key to live in
 ** the array part of the table, -1 otherwise.
 */
+// 返回key在array中的下标，如果不可能存在则返回-1
 static int arrayindex (const TValue *key) {
   if (ttisnumber(key)) {
     lua_Number n = nvalue(key);
@@ -141,6 +154,12 @@ static int arrayindex (const TValue *key) {
 ** elements in the array part, then elements in the hash part. The
 ** beginning of a traversal is signaled by -1.
 */
+// 找出一个key在table中的下标
+// 其中arrayindex中的返回值要再减去1，因为lua中array是从1开始计数的，要矫正为C的下标计数
+// 如果不在array中，则到hash部分寻找
+// hash部分从mainposition开始遍历，遇到相同的key则返回对应下标
+// 其中deadkey还是可以使用next字段的，因为node中key的next字段和key是分开存储的
+// PS: 该函数只是用于luaH_next
 static int findindex (lua_State *L, Table *t, StkId key) {
   int i;
   if (ttisnil(key)) return -1;  /* first iteration */
@@ -153,7 +172,7 @@ static int findindex (lua_State *L, Table *t, StkId key) {
       /* key may be dead already, but it is ok to use it in `next' */
       if (luaV_rawequalobj(gkey(n), key) ||
             (ttisdeadkey(gkey(n)) && iscollectable(key) &&
-             deadvalue(gkey(n)) == gcvalue(key))) {
+             deadvalue(gkey(n)) == gcvalue(key))) { // 参数key有可能就是deadkey，想想看这句话的作用。
         i = cast_int(n - gnode(t, 0));  /* key index in hash table */
         /* hash elements are numbered after array ones */
         return i + t->sizearray;
@@ -165,7 +184,7 @@ static int findindex (lua_State *L, Table *t, StkId key) {
   }
 }
 
-
+// next函数，被上层调用，用于设置lua栈上的值为参数key的下一个key和value
 int luaH_next (lua_State *L, Table *t, StkId key) {
   int i = findindex(L, t, key);  /* find original element */
   for (i++; i < t->sizearray; i++) {  /* try first array part */
@@ -192,7 +211,7 @@ int luaH_next (lua_State *L, Table *t, StkId key) {
 ** ==============================================================
 */
 
-
+// 计算array利用超过50%的最大值
 static int computesizes (int nums[], int *narray) {
   int i;
   int twotoi;  /* 2^i */
@@ -214,7 +233,7 @@ static int computesizes (int nums[], int *narray) {
   return na;
 }
 
-
+// 把可以放入array的key都统计到nums中，用于后面array的效率值计算
 static int countint (const TValue *key, int *nums) {
   int k = arrayindex(key);
   if (0 < k && k <= MAXASIZE) {  /* is `key' an appropriate array index? */
@@ -225,7 +244,7 @@ static int countint (const TValue *key, int *nums) {
     return 0;
 }
 
-
+// 统计table的array信息
 static int numusearray (const Table *t, int *nums) {
   int lg;
   int ttlg;  /* 2^lg */
@@ -250,7 +269,7 @@ static int numusearray (const Table *t, int *nums) {
   return ause;
 }
 
-
+// 统计table的hash信息
 static int numusehash (const Table *t, int *nums, int *pnasize) {
   int totaluse = 0;  /* total number of elements */
   int ause = 0;  /* summation of `nums' */
@@ -266,7 +285,7 @@ static int numusehash (const Table *t, int *nums, int *pnasize) {
   return totaluse;
 }
 
-
+// 重新realloc table的array大小，并初始化新增的部分
 static void setarrayvector (lua_State *L, Table *t, int size) {
   int i;
   luaM_reallocvector(L, t->array, t->sizearray, size, TValue);
@@ -275,7 +294,7 @@ static void setarrayvector (lua_State *L, Table *t, int size) {
   t->sizearray = size;
 }
 
-
+// 根据size新建table的nodevector
 static void setnodevector (lua_State *L, Table *t, int size) {
   int lsize;
   if (size == 0) {  /* no elements to hash part? */
@@ -300,7 +319,8 @@ static void setnodevector (lua_State *L, Table *t, int size) {
   t->lastfree = gnode(t, size);  /* all positions are free */
 }
 
-
+// rehash的底层实现
+// 更据是放大还是缩小进行rehash
 void luaH_resize (lua_State *L, Table *t, int nasize, int nhsize) {
   int i;
   int oldasize = t->sizearray;
@@ -333,13 +353,16 @@ void luaH_resize (lua_State *L, Table *t, int nasize, int nhsize) {
     luaM_freearray(L, nold, cast(size_t, twoto(oldhsize))); /* free old array */
 }
 
-
+// 上层调用接口，改变array的大小
 void luaH_resizearray (lua_State *L, Table *t, int nasize) {
   int nsize = isdummy(t->node) ? 0 : sizenode(t);
   luaH_resize(L, t, nasize, nsize);
 }
 
-
+// 重新哈希整个table
+// 首先统计数字和其它键的信息
+// 根据统计信息，重新resize整个table
+// 保证array的利用率上50%, hash的大小为二的幂次数
 static void rehash (lua_State *L, Table *t, const TValue *ek) {
   int nasize, na;
   int nums[MAXBITS+1];  /* nums[i] = number of keys with 2^(i-1) < k <= 2^i */
@@ -364,7 +387,7 @@ static void rehash (lua_State *L, Table *t, const TValue *ek) {
 ** }=============================================================
 */
 
-
+// 创建一个table
 Table *luaH_new (lua_State *L) {
   Table *t = &luaC_newobj(L, LUA_TTABLE, sizeof(Table), NULL, 0)->h;
   t->metatable = NULL;
@@ -375,7 +398,7 @@ Table *luaH_new (lua_State *L) {
   return t;
 }
 
-
+// free掉一个table
 void luaH_free (lua_State *L, Table *t) {
   if (!isdummy(t->node))
     luaM_freearray(L, t->node, cast(size_t, sizenode(t)));
@@ -383,7 +406,7 @@ void luaH_free (lua_State *L, Table *t) {
   luaM_free(L, t);
 }
 
-
+// 获取一个table的freenode
 static Node *getfreepos (Table *t) {
   while (t->lastfree > t->node) {
     t->lastfree--;
@@ -402,6 +425,12 @@ static Node *getfreepos (Table *t) {
 ** put new key in its main position; otherwise (colliding node is in its main
 ** position), new key goes to an empty position.
 */
+// 插入一个新键
+// 先找到新键的mainposition，如果没被占用且已经初始化过(即不位null)则直接赋值返回
+// 否则先用getfreepos获取新的node，如果获取失败则rehash，重新set
+// 否则如果mainposition碰撞了，则判断表中mainposion位置的node的mainposition是否是自己位置
+// 如果是则新键往后放，否则放新键，旧键转移到free位置
+// 最后gc需要从新barrierback这个table
 TValue *luaH_newkey (lua_State *L, Table *t, const TValue *key) {
   Node *mp;
   if (ttisnil(key)) luaG_runerror(L, "table index is nil");
@@ -443,6 +472,7 @@ TValue *luaH_newkey (lua_State *L, Table *t, const TValue *key) {
 /*
 ** search function for integers
 */
+// 整数搜索入口，整数的快速定位搜索
 const TValue *luaH_getint (Table *t, int key) {
   /* (1 <= key && key <= t->sizearray) */
   if (cast(unsigned int, key-1) < cast(unsigned int, t->sizearray))
@@ -463,6 +493,7 @@ const TValue *luaH_getint (Table *t, int key) {
 /*
 ** search function for short strings
 */
+// 短字符串的搜索入口，可以快速比较定位
 const TValue *luaH_getstr (Table *t, TString *key) {
   Node *n = hashstr(t, key);
   lua_assert(key->tsv.tt == LUA_TSHRSTR);
@@ -478,6 +509,9 @@ const TValue *luaH_getstr (Table *t, TString *key) {
 /*
 ** main search function
 */
+// 根据key获取对应的value，主搜索入口
+// 根据类型分别处理
+// 如果都不匹配则使用luaV_rawequalobj来进行深度相等搜素
 const TValue *luaH_get (Table *t, const TValue *key) {
   switch (ttype(key)) {
     case LUA_TSHRSTR: return luaH_getstr(t, rawtsvalue(key));
@@ -507,6 +541,7 @@ const TValue *luaH_get (Table *t, const TValue *key) {
 ** beware: when using this function you probably need to check a GC
 ** barrier and invalidate the TM cache.
 */
+// 设置table的key并返回value，使用这个函数，可能需要注意下GC的问题。例如对table进行barrierback
 TValue *luaH_set (lua_State *L, Table *t, const TValue *key) {
   const TValue *p = luaH_get(t, key);
   if (p != luaO_nilobject)
@@ -514,7 +549,7 @@ TValue *luaH_set (lua_State *L, Table *t, const TValue *key) {
   else return luaH_newkey(L, t, key);
 }
 
-
+// table[key] = value，key为int
 void luaH_setint (lua_State *L, Table *t, int key, TValue *value) {
   const TValue *p = luaH_getint(t, key);
   TValue *cell;
@@ -528,7 +563,8 @@ void luaH_setint (lua_State *L, Table *t, int key, TValue *value) {
   setobj2t(L, cell, value);
 }
 
-
+// 先二分扩大，再二分收敛定位。
+// 明显这些函数是专门用于把table当array用的
 static int unbound_search (Table *t, unsigned int j) {
   unsigned int i = j;  /* i is zero or a present index */
   j++;
@@ -557,6 +593,8 @@ static int unbound_search (Table *t, unsigned int j) {
 ** Try to find a boundary in table `t'. A `boundary' is an integer index
 ** such that t[i] is non-nil and t[i+1] is nil (and 0 if t[1] is nil).
 */
+// 尝试寻找这样的i使得 t[i] != nil && t[i+1] == nil
+// 二分搜索array，如果array最后一个slot为空
 int luaH_getn (Table *t) {
   unsigned int j = t->sizearray;
   if (j > 0 && ttisnil(&t->array[j - 1])) {

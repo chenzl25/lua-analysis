@@ -494,6 +494,11 @@ typedef struct LocVar {
 /*
 ** Function Prototypes
 */
+// 函数原型
+// 记录了常量表，字节码，debug的行信息和局部变量，源代码等
+// upvalue信息
+// 参数个数，是否变长，最大的栈空间大小
+// cache是用于避免多次产生相同的closure
 typedef struct Proto {
   CommonHeader;
   TValue *k;  /* constants used by the function */
@@ -523,6 +528,10 @@ typedef struct Proto {
 /*
 ** Lua Upvalues
 */
+// upvalue，其中v指向栈上的对象或者结构体中的value
+// 当upvalue是open着的时候,v指向栈上的对象，且自身链接在Lstate的openupval上
+// 当upvalue是closed的时候，v指向自身结构体的value，且解开Lstate的openupval上的链接
+// 当调用栈收缩upvalue就会被closed
 typedef struct UpVal {
   CommonHeader;
   TValue *v;  /* points to stack or to its own value */
@@ -549,14 +558,14 @@ typedef struct CClosure {
   TValue upvalue[1];  /* list of upvalues */
 } CClosure;
 
-
+// closure包括函数原型和upval
 typedef struct LClosure {
   ClosureHeader;
   struct Proto *p;
   UpVal *upvals[1];  /* list of upvalues */
 } LClosure;
 
-
+// 闭包可以是C实现的，也可以是lua本身的
 typedef union Closure {
   CClosure c;
   LClosure l;

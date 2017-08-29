@@ -99,9 +99,7 @@ static void seterrorobj (lua_State *L, int errcode, StkId oldtop) {
   L->top = oldtop + 1;
 }
 
-// lua内部异常抛出
-// 如果是c底层通过setjump和longjump来实现
-// 如果是c++底层直接用throw来实现
+
 l_noret luaD_throw (lua_State *L, int errcode) {
   if (L->errorJmp) {  /* thread has an error handler? */
     L->errorJmp->status = errcode;  /* set status */
@@ -123,7 +121,7 @@ l_noret luaD_throw (lua_State *L, int errcode) {
   }
 }
 
-// 相当于lua的保护模式下运行，有try，catch的异常保护机制
+
 int luaD_rawrunprotected (lua_State *L, Pfunc f, void *ud) {
   unsigned short oldnCcalls = L->nCcalls;
   struct lua_longjmp lj;
@@ -638,7 +636,9 @@ static void checkmode (lua_State *L, const char *mode, const char *x) {
   }
 }
 
-
+// paser会根据lua二进制或文本文件创建Closure
+// 其中的upval是new出来的，不是在栈上的
+// 而新创建出来的upval是会被赋值成_ENV的，见Lapi.c的lua_load
 static void f_parser (lua_State *L, void *ud) {
   int i;
   Closure *cl;
