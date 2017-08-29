@@ -551,7 +551,7 @@ LUA_API const char *lua_pushfstring (lua_State *L, const char *fmt, ...) {
   return ret;
 }
 
-
+// 对于n==0的CClosure即是轻量级C函数，可以连CClosure的申请都省了
 LUA_API void lua_pushcclosure (lua_State *L, lua_CFunction fn, int n) {
   lua_lock(L);
   if (n == 0) {

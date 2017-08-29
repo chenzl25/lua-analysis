@@ -68,6 +68,7 @@ typedef struct stringtable {
 /*
 ** information about a call
 */
+// lua的调用信息
 typedef struct CallInfo {
   StkId func;  /* function index in the stack */
   StkId	top;  /* top for this function */
@@ -94,6 +95,7 @@ typedef struct CallInfo {
 /*
 ** Bits in CallInfo status
 */
+// 调用信息的状态
 #define CIST_LUA	(1<<0)	/* call is running a Lua function */
 #define CIST_HOOKED	(1<<1)	/* call is running a debug hook */
 #define CIST_REENTRY	(1<<2)	/* call is running on same invocation of

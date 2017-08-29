@@ -10,7 +10,7 @@
 
 #include "lobject.h"
 
-
+// 有n个upvalue的closure大小
 #define sizeCclosure(n)	(cast(int, sizeof(CClosure)) + \
                          cast(int, sizeof(TValue)*((n)-1)))
 

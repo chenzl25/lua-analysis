@@ -109,7 +109,7 @@ void luaE_setdebt (global_State *g, l_mem debt) {
   g->GCdebt = debt;
 }
 
-
+// 扩展调用栈
 CallInfo *luaE_extendCI (lua_State *L) {
   CallInfo *ci = luaM_new(L, CallInfo);
   lua_assert(L->ci->next == NULL);
@@ -119,7 +119,7 @@ CallInfo *luaE_extendCI (lua_State *L) {
   return ci;
 }
 
-
+// 清空多余的callinfo，next后面是多余的。
 void luaE_freeCI (lua_State *L) {
   CallInfo *ci = L->ci;
   CallInfo *next = ci->next;
@@ -130,7 +130,8 @@ void luaE_freeCI (lua_State *L) {
   }
 }
 
-
+// 初始化栈包括栈的内存申请，top指针初始化
+// 以及第一个ci
 static void stack_init (lua_State *L1, lua_State *L) {
   int i; CallInfo *ci;
   /* initialize stack array */
@@ -150,7 +151,7 @@ static void stack_init (lua_State *L1, lua_State *L) {
   L1->ci = ci;
 }
 
-
+// 回收栈
 static void freestack (lua_State *L) {
   if (L->stack == NULL)
     return;  /* stack not completely built yet */
@@ -235,7 +236,7 @@ static void close_state (lua_State *L) {
   (*g->frealloc)(g->ud, fromstate(L), sizeof(LG), 0);  /* free main block */
 }
 
-
+// 新建一个lua线程
 LUA_API lua_State *lua_newthread (lua_State *L) {
   lua_State *L1;
   lua_lock(L);

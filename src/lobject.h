@@ -552,6 +552,7 @@ typedef struct UpVal {
 #define ClosureHeader \
 	CommonHeader; lu_byte nupvalues; GCObject *gclist
 
+// CClosure的upvalue是天生关闭的，所以只需用TValue来存
 typedef struct CClosure {
   ClosureHeader;
   lua_CFunction f;

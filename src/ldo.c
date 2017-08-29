@@ -124,6 +124,7 @@ l_noret luaD_throw (lua_State *L, int errcode) {
 }
 
 // 相当于lua的保护模式下运行，有try，catch的异常保护机制
+// 每调用一次该函数，longjump的链就会更长
 int luaD_rawrunprotected (lua_State *L, Pfunc f, void *ud) {
   unsigned short oldnCcalls = L->nCcalls;
   struct lua_longjmp lj;
@@ -140,7 +141,7 @@ int luaD_rawrunprotected (lua_State *L, Pfunc f, void *ud) {
 
 /* }====================================================== */
 
-
+// 将L中的openupval和ci的相关指针都从旧栈转到新栈
 static void correctstack (lua_State *L, TValue *oldstack) {
   CallInfo *ci;
   GCObject *up;
@@ -159,7 +160,7 @@ static void correctstack (lua_State *L, TValue *oldstack) {
 /* some space for error handling */
 #define ERRORSTACKSIZE	(LUAI_MAXSTACK + 200)
 
-
+// 扩展栈空间至newsize，这需要重新correct栈的其它指针
 void luaD_reallocstack (lua_State *L, int newsize) {
   TValue *oldstack = L->stack;
   int lim = L->stacksize;
@@ -173,7 +174,7 @@ void luaD_reallocstack (lua_State *L, int newsize) {
   correctstack(L, oldstack);
 }
 
-
+// 增长栈的大小，2倍增加
 void luaD_growstack (lua_State *L, int n) {
   int size = L->stacksize;
   if (size > LUAI_MAXSTACK)  /* error after extra size? */
@@ -288,7 +289,7 @@ static StkId tryfuncTM (lua_State *L, StkId func) {
 }
 
 
-
+// 获取下个ci,如果有非NULL则返回，否则扩展新建一个
 #define next_ci(L) (L->ci = (L->ci->next ? L->ci->next : luaE_extendCI(L)))
 
 
@@ -638,9 +639,9 @@ static void checkmode (lua_State *L, const char *mode, const char *x) {
   }
 }
 
-// paser»á¸ù¾Ýlua¶þ½øÖÆ»òÎÄ±¾ÎÄ¼þ´´½¨Closure
-// ÆäÖÐµÄupvalÊÇnew³öÀ´µÄ£¬²»ÊÇÔÚÕ»ÉÏµÄ
-// ¶øÐÂ´´½¨³öÀ´µÄupvalÊÇ»á±»¸³Öµ³É_ENVµÄ£¬¼ûLapi.cµÄlua_load
+// paser?á?ù?Ylua?t?????ò??±????t′′?¨Closure
+// ???Dμ?upvalê?new3?à′μ?￡?2?ê??ú??é?μ?
+// ??D?′′?¨3?à′μ?upvalê??á±??3?μ3é_ENVμ?￡???Lapi.cμ?lua_load
 static void f_parser (lua_State *L, void *ud) {
   int i;
   Closure *cl;
