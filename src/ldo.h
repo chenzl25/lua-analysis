@@ -12,13 +12,15 @@
 #include "lstate.h"
 #include "lzio.h"
 
-
+// 保证栈last距离top有n个单位的空间
 #define luaD_checkstack(L,n)	if (L->stack_last - L->top <= (n)) \
 				    luaD_growstack(L, n); else condmovestack(L);
 
-
+// 带增长栈大小的top指针自增
 #define incr_top(L) {L->top++; luaD_checkstack(L,0);}
 
+// 保存栈顶指针，和恢复栈顶指针会用到
+// 在checkstatck的时候，记录下偏移值，因为checkstack可能会改变栈的地址
 #define savestack(L,p)		((char *)(p) - (char *)L->stack)
 #define restorestack(L,n)	((TValue *)((char *)L->stack + (n)))
 

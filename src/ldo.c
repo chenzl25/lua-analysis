@@ -296,6 +296,9 @@ static StkId tryfuncTM (lua_State *L, StkId func) {
 /*
 ** returns true if function has been executed (C function)
 */
+// precall函数调用，返回1时代表已经顺便把C函数执行并回退栈返回了，否则只是precall
+// 压调用栈，处理下hook函数，还有先扩充栈大小的处理
+// PS:对LUA调用的多参数类型处理细节上有所不同
 int luaD_precall (lua_State *L, StkId func, int nresults) {
   lua_CFunction f;
   CallInfo *ci;
@@ -361,7 +364,7 @@ int luaD_precall (lua_State *L, StkId func, int nresults) {
   }
 }
 
-
+// poscall函数调用，回退调用栈，处理返回值
 int luaD_poscall (lua_State *L, StkId firstResult) {
   StkId res;
   int wanted, i;
@@ -393,6 +396,7 @@ int luaD_poscall (lua_State *L, StkId firstResult) {
 ** When returns, all the results are on the stack, starting at the original
 ** function position.
 */
+// 调用一个C或者lua函数
 void luaD_call (lua_State *L, StkId func, int nResults, int allowyield) {
   if (++L->nCcalls >= LUAI_MAXCCALLS) {
     if (L->nCcalls == LUAI_MAXCCALLS)
@@ -594,7 +598,7 @@ LUA_API int lua_yieldk (lua_State *L, int nresults, int ctx, lua_CFunction k) {
   return 0;  /* return to 'luaD_hook' */
 }
 
-
+// 受保护的函数调用
 int luaD_pcall (lua_State *L, Pfunc func, void *u,
                 ptrdiff_t old_top, ptrdiff_t ef) {
   int status;
