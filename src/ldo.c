@@ -243,7 +243,7 @@ void luaD_hook (lua_State *L, int event, int line) {
   }
 }
 
-
+// 调用hook函数，由precall调用
 static void callhook (lua_State *L, CallInfo *ci) {
   int hook = LUA_HOOKCALL;
   ci->u.l.savedpc++;  /* hooks assume 'pc' is already incremented */
@@ -256,7 +256,7 @@ static void callhook (lua_State *L, CallInfo *ci) {
   ci->u.l.savedpc--;  /* correct 'pc' */
 }
 
-
+// 把变长参数的定长部分拿到新一级frame中
 static StkId adjust_varargs (lua_State *L, Proto *p, int actual) {
   int i;
   int nfixargs = p->numparams;
@@ -412,7 +412,7 @@ void luaD_call (lua_State *L, StkId func, int nResults, int allowyield) {
   L->nCcalls--;
 }
 
-
+// 完成剩下的C调用，直接调用k函数，并撤栈
 static void finishCcall (lua_State *L) {
   CallInfo *ci = L->ci;
   int n;
@@ -437,7 +437,8 @@ static void finishCcall (lua_State *L) {
   luaD_poscall(L, L->top - n);
 }
 
-
+// 根据是c调用还是lua调用，分别处理
+// 用于执行剩下的调用栈，到协程结束
 static void unroll (lua_State *L, void *ud) {
   UNUSED(ud);
   for (;;) {
@@ -456,6 +457,8 @@ static void unroll (lua_State *L, void *ud) {
 /*
 ** check whether thread has a suspended protected call
 */
+// 在调用栈上寻找CIST_YPCALL状态的调用信息
+// 这种状态的pcall只能是pcallk中可yield的c调用才会有
 static CallInfo *findpcall (lua_State *L) {
   CallInfo *ci;
   for (ci = L->ci; ci != NULL; ci = ci->previous) {  /* search for a pcall */
@@ -465,7 +468,8 @@ static CallInfo *findpcall (lua_State *L) {
   return NULL;  /* no pending pcall */
 }
 
-
+// 在lua_resume中被调用，用于判断resume过程中非yield跳出的情况是否可恢复
+// 通过findpcall来判断，因为pcall语义上可以比resume提前捕获到错误并处理
 static int recover (lua_State *L, int status) {
   StkId oldtop;
   CallInfo *ci = findpcall(L);
@@ -501,6 +505,10 @@ static l_noret resume_error (lua_State *L, const char *msg, StkId firstArg) {
 /*
 ** do the work for 'lua_resume' in protected mode
 */
+// resume分几种情况
+// 1.直接开始一个协程(可以为C或lua的closure)
+// 2.从yield过的协程开始(如果是lua closure直接execute，否则cclosure调用k continuation)
+// 		函数k调用完后，撤一级调用，再进行unroll继续运行下去
 static void resume (lua_State *L, void *ud) {
   int nCcalls = L->nCcalls;
   StkId firstArg = cast(StkId, ud);
@@ -539,7 +547,9 @@ static void resume (lua_State *L, void *ud) {
   lua_assert(nCcalls == L->nCcalls);
 }
 
-
+// resume一个协程，会以保护态调用真实的resume函数。
+// luaD_rawrunprotected resume 是可以通过resume对应的协程yield返回的，返回继续正常的逻辑
+// 也可以是因为其它thread错误状态返回，如果是这种情况则可以通过判断是否可以revover来处理
 LUA_API int lua_resume (lua_State *L, lua_State *from, int nargs) {
   int status;
   int oldnny = L->nny;  /* save 'nny' */

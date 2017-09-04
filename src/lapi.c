@@ -876,7 +876,7 @@ LUA_API void lua_setuservalue (lua_State *L, int idx) {
      api_check(L, (nr) == LUA_MULTRET || (L->ci->top - L->top >= (nr) - (na)), \
 	"results from function overflow current stack size")
 
-
+// 获取c调用中yield前的保留状态
 LUA_API int lua_getctx (lua_State *L, int *ctx) {
   if (L->ci->callstatus & CIST_YIELDED) {
     if (ctx) *ctx = L->ci->u.c.ctx;
@@ -885,7 +885,7 @@ LUA_API int lua_getctx (lua_State *L, int *ctx) {
   else return LUA_OK;
 }
 
-
+// 带k函数的call，如果没有k传入则该函数不能yeild，即便指向的是lua函数，因为callk是API函数
 LUA_API void lua_callk (lua_State *L, int nargs, int nresults, int ctx,
                         lua_CFunction k) {
   StkId func;
@@ -924,7 +924,12 @@ static void f_call (lua_State *L, void *ud) {
 }
 
 
-
+// 受保护的callk，如果调用没k函数或者nny>0则使用pcall模式
+// 否则为了可以后续resume得到C调用，要在ci上保留k函数信息
+// PS: 在可yield和k存在的情况下，不直接使用protected模式，而是由在resume中的protected模式来保证，
+//     当resume中发现有thread状态错误的时候且可以revover的时候，会调用unroll来处理错误，
+// 	   之所以这样设计是为了让深层次的yield后，不会破坏保护点。因为yeild是通过throw来实现的，
+//     如果直接用protected模式，在yield后从新resume出现了错误后就无法捕捉错误了
 LUA_API int lua_pcallk (lua_State *L, int nargs, int nresults, int errfunc,
                         int ctx, lua_CFunction k) {
   struct CallS c;
