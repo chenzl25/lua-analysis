@@ -216,7 +216,7 @@ void luaD_shrinkstack (lua_State *L) {
     luaD_reallocstack(L, goodsize);  /* shrink it */
 }
 
-
+// 调用钩子函数
 void luaD_hook (lua_State *L, int event, int line) {
   lua_Hook hook = L->hook;
   if (hook && L->allowhook) {
@@ -273,7 +273,7 @@ static StkId adjust_varargs (lua_State *L, Proto *p, int actual) {
   return base;
 }
 
-
+// 尝试获取tag method
 static StkId tryfuncTM (lua_State *L, StkId func) {
   const TValue *tm = luaT_gettmbyobj(L, func, TM_CALL);
   StkId p;
@@ -396,7 +396,8 @@ int luaD_poscall (lua_State *L, StkId firstResult) {
 ** When returns, all the results are on the stack, starting at the original
 ** function position.
 */
-// 调用一个C或者lua函数
+// 调用一个C或者lua函数,其中nny代表不能yield的数目。
+// 因为C本身无法提供延续点的支持，所以不是所有函数都能yield
 void luaD_call (lua_State *L, StkId func, int nResults, int allowyield) {
   if (++L->nCcalls >= LUAI_MAXCCALLS) {
     if (L->nCcalls == LUAI_MAXCCALLS)
@@ -570,7 +571,9 @@ LUA_API int lua_resume (lua_State *L, lua_State *from, int nargs) {
   return status;
 }
 
-
+// lua_yieldk是个公开的API，所以这是函数的调用是一定处于一个C函数的调用当中
+// lua对于C函数中yield是通过k函数continuation来实现C不支持的延续的。
+// PS:如果遇到调用调用信息ci是LUA的话，绝对就是c层面的hook函数，它不能延续，所以k不能有值
 LUA_API int lua_yieldk (lua_State *L, int nresults, int ctx, lua_CFunction k) {
   CallInfo *ci = L->ci;
   luai_userstateyield(L, nresults);
