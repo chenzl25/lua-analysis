@@ -365,7 +365,7 @@ static int luaB_select (lua_State *L) {
   }
 }
 
-
+// 处理pcall的返回值
 static int finishpcall (lua_State *L, int status) {
   if (!lua_checkstack(L, 1)) {  /* no space for extra boolean? */
     lua_settop(L, 0);  /* create space for return values */
@@ -378,13 +378,21 @@ static int finishpcall (lua_State *L, int status) {
   return lua_gettop(L);
 }
 
-
+// 为pcall的continuation
+// 如果是yield状态，则执行finishpcall
 static int pcallcont (lua_State *L) {
   int status = lua_getctx(L, NULL);
   return finishpcall(L, (status == LUA_YIELD));
 }
 
-
+// 为pcall调用的底层实现，其中的insert为了保证返回值有2个slot存在
+// 	[top ]
+//	[... ]
+//	[arg2]
+//	[arg1]
+//	[func]
+//	[xxx ](insert space)
+//	[ci  ]
 static int luaB_pcall (lua_State *L) {
   int status;
   luaL_checkany(L, 1);
@@ -413,7 +421,7 @@ static int luaB_tostring (lua_State *L) {
   return 1;
 }
 
-
+// _G的基础函数
 static const luaL_Reg base_funcs[] = {
   {"assert", luaB_assert},
   {"collectgarbage", luaB_collectgarbage},
@@ -443,7 +451,7 @@ static const luaL_Reg base_funcs[] = {
   {NULL, NULL}
 };
 
-
+// 初始化_G
 LUAMOD_API int luaopen_base (lua_State *L) {
   /* set global _G */
   lua_pushglobaltable(L);
