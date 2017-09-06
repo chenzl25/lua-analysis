@@ -426,7 +426,7 @@ static Node *getfreepos (Table *t) {
 ** position), new key goes to an empty position.
 */
 // 插入一个新键
-// 先找到新键的mainposition，如果没被占用且已经初始化过(即不位null)则直接赋值返回
+// 先找到新键的mainposition，如果没被占用且已经初始化过(即不为null)则直接赋值返回
 // 否则先用getfreepos获取新的node，如果获取失败则rehash，重新set
 // 否则如果mainposition碰撞了，则判断表中mainposion位置的node的mainposition是否是自己位置
 // 如果是则新键往后放，否则放新键，旧键转移到free位置

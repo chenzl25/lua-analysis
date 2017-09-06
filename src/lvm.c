@@ -132,7 +132,8 @@ void luaV_gettable (lua_State *L, const TValue *t, TValue *key, StkId val) {
   luaG_runerror(L, "loop in gettable");
 }
 
-
+// 设置一个表的key-value
+// 需要查询new_index元表
 void luaV_settable (lua_State *L, const TValue *t, TValue *key, StkId val) {
   int loop;
   for (loop = 0; loop < MAXTAGLOOP; loop++) {
@@ -142,13 +143,17 @@ void luaV_settable (lua_State *L, const TValue *t, TValue *key, StkId val) {
       TValue *oldval = cast(TValue *, luaH_get(h, key));
       /* if previous value is not nil, there must be a previous entry
          in the table; moreover, a metamethod has no relevance */
+      // 如果oldval为tag为空，PS:tag为空类型并不代表oldval为luaO_nilobject
       if (!ttisnil(oldval) ||
          /* previous value is nil; must check the metamethod */
+	      // 如果类型为空则要看看元表
          ((tm = fasttm(L, h->metatable, TM_NEWINDEX)) == NULL &&
          /* no metamethod; is there a previous entry in the table? */
+	  	 // 没有元表，根据oldval判断key，是否在链上
          (oldval != luaO_nilobject ||
          /* no previous entry; must create one. (The next test is
             always true; we only need the assignment.) */
+         // 不在链上，新建key
          (oldval = luaH_newkey(L, h, key), 1)))) {
         /* no metamethod and (now) there is an entry with given key */
         setobj2t(L, oldval, val);  /* assign new value to that entry */

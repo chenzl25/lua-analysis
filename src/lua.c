@@ -322,7 +322,7 @@ static void dotty (lua_State *L) {
   progname = oldprogname;
 }
 
-
+// Ö´ÐÐ½Å±¾
 static int handle_script (lua_State *L, char **argv, int n) {
   int status;
   const char *fname;

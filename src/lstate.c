@@ -164,6 +164,7 @@ static void freestack (lua_State *L) {
 /*
 ** Create registry table and its predefined values
 */
+// 注册表初始化，把线程和_G都放进去
 static void init_registry (lua_State *L, global_State *g) {
   TValue mt;
   /* create registry */

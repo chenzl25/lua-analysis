@@ -51,7 +51,11 @@ const char lua_ident[] =
 #define api_checkstackindex(L, i, o)  \
 	api_check(L, isstackindex(i, o), "index not in the stack")
 
-
+// 将index转化为栈上的地址
+// 当index > 0时代表调用栈函数往上计数
+// 当index < 0时分为pseudo index和从top指针开始往下数的情况，从LUA_REGISTRYINDEX分隔
+// LUA_REGISTRYINDEX自己对应着g->l_registry
+// 比LUA_REGISTRYINDEX更小的最后会变成访问当前函数的upvalue
 static TValue *index2addr (lua_State *L, int idx) {
   CallInfo *ci = L->ci;
   if (idx > 0) {
@@ -730,7 +734,7 @@ LUA_API void lua_getuservalue (lua_State *L, int idx) {
 ** set functions (stack -> Lua)
 */
 
-
+// _G[var] = [top-1]，其中[top-1]只表示调用函数前。过程中top会变化
 LUA_API void lua_setglobal (lua_State *L, const char *var) {
   Table *reg = hvalue(&G(L)->l_registry);
   const TValue *gt;  /* global table */
@@ -974,7 +978,7 @@ LUA_API int lua_pcallk (lua_State *L, int nargs, int nresults, int errfunc,
   return status;
 }
 
-
+// load文件的创建closure的函数，其中会把_G置入其中的upvalue
 LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
                       const char *chunkname, const char *mode) {
   ZIO z;

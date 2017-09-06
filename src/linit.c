@@ -26,6 +26,7 @@
 ** these libs are loaded by lua.c and are readily available to any Lua
 ** program
 */
+// lua自带的库
 static const luaL_Reg loadedlibs[] = {
   {"_G", luaopen_base},
   {LUA_LOADLIBNAME, luaopen_package},
@@ -48,7 +49,7 @@ static const luaL_Reg preloadedlibs[] = {
   {NULL, NULL}
 };
 
-
+// 载入所有自带库
 LUALIB_API void luaL_openlibs (lua_State *L) {
   const luaL_Reg *lib;
   /* call open functions from 'loadedlibs' and set results to global table */
