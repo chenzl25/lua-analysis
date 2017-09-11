@@ -78,7 +78,7 @@ static int luaB_auxwrap (lua_State *L) {
   return r;
 }
 
-
+// 创建一个协程程，实际上就是根据stack[top-1]上的函数来新建一个Lstate
 static int luaB_cocreate (lua_State *L) {
   lua_State *NL;
   luaL_checktype(L, 1, LUA_TFUNCTION);
@@ -88,7 +88,7 @@ static int luaB_cocreate (lua_State *L) {
   return 1;
 }
 
-
+// 创建一个函数，调用它就能进入协程
 static int luaB_cowrap (lua_State *L) {
   luaB_cocreate(L);
   lua_pushcclosure(L, luaB_auxwrap, 1);

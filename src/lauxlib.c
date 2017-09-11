@@ -883,7 +883,7 @@ LUALIB_API int luaL_getsubtable (lua_State *L, int idx, const char *fname) {
 ** is true, also registers the result in the global table.
 ** Leaves resulting module on the top.
 */
-// 调用提供的luaC函数注册库，并放进package._loaded中
+// 调用提供的luaC函数注册库，并放进注册表的_LOADED中
 // glb选项表示要不要放到_G表中
 LUALIB_API void luaL_requiref (lua_State *L, const char *modname,
                                lua_CFunction openf, int glb) {

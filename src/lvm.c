@@ -726,6 +726,7 @@ void luaV_execute (lua_State *L) {
         }
       )
       vmcase(OP_TAILCALL,
+      	// 尾递归调用，复用之前的函数栈
         int b = GETARG_B(i);
         if (b != 0) L->top = ra+b;  /* else previous instruction set top */
         lua_assert(GETARG_C(i) - 1 == LUA_MULTRET);
@@ -759,6 +760,8 @@ void luaV_execute (lua_State *L) {
         if (b != 0) L->top = ra+b-1;
         if (cl->p->sizep > 0) luaF_close(L, base);
         b = luaD_poscall(L, ra);
+		// 当调用为非lua函数进来的时候，跳出
+		// ps:尾递归也是CIST_REENTRY的，因为CIST_TAIL只是或进旧的ci中
         if (!(ci->callstatus & CIST_REENTRY))  /* 'ci' still the called one */
           return;  /* external invocation: return */
         else {  /* invocation via reentry: continue execution */

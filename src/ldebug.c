@@ -89,7 +89,7 @@ LUA_API int lua_gethookcount (lua_State *L) {
   return L->basehookcount;
 }
 
-
+// 获取第level层的函数调用
 LUA_API int lua_getstack (lua_State *L, int level, lua_Debug *ar) {
   int status;
   CallInfo *ci;

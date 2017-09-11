@@ -131,7 +131,7 @@ void luaE_freeCI (lua_State *L) {
 }
 
 // 初始化栈包括栈的内存申请，top指针初始化
-// 以及第一个ci
+// 以及第一个ci,其中的ci->func为空，只使用栈地址
 static void stack_init (lua_State *L1, lua_State *L) {
   int i; CallInfo *ci;
   /* initialize stack array */
