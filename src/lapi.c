@@ -1072,6 +1072,9 @@ LUA_API int lua_gc (lua_State *L, int what, int data) {
       break;
     }
     case LUA_GCSETPAUSE: {
+	  // estimate <= 100的时候，就代表执行完一个周期之后不会等待，直接进入下一个周期。
+	  // estimate = 200的时候，就代表当内存达到上一个周期结束时的两倍的时候，再进入下一个周期。
+	  // 以此类推
       res = g->gcpause;
       g->gcpause = data;
       break;

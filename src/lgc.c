@@ -132,6 +132,10 @@ static int iscleared (global_State *g, const TValue *o) {
 ** barrier that moves collector forward, that is, mark the white object
 ** being pointed by a black object.
 */
+// 向前barrier其中，o.v   o为黑色，v为白色
+// 所以如果在标记阶段，v需要通过reallymarkobject变成灰色
+// 如果在扫描阶段，则直接将o置成白色，防止后续扫描阶段多次触发barrier
+// 这也是扫描阶段不变量被打破的原因
 void luaC_barrier_ (lua_State *L, GCObject *o, GCObject *v) {
   global_State *g = G(L);
   lua_assert(isblack(o) && iswhite(v) && !isdead(g, v) && !isdead(g, o));
@@ -152,6 +156,7 @@ void luaC_barrier_ (lua_State *L, GCObject *o, GCObject *v) {
 ** only works for tables; access to 'gclist' is not uniform across
 ** different types.)
 */
+// 后向barrier,将o重新标成灰色放到grayagain中，放到atomic阶段中重新遍历，保证gray链表会空
 void luaC_barrierback_ (lua_State *L, GCObject *o) {
   global_State *g = G(L);
   lua_assert(isblack(o) && !isdead(g, o) && gch(o)->tt == LUA_TTABLE);
@@ -169,6 +174,9 @@ void luaC_barrierback_ (lua_State *L, GCObject *o) {
 ** it again. Otherwise, use a backward barrier, to avoid marking all
 ** possible instances.
 */
+// 对proto的特殊barrier处理，当proto第一次被用于创建一个closure时候会cache
+// 在cache为空时，即第一次使用前向barrier，否则使用后向barrier
+// proto多次产生closure的情况出现在返回一个新建的闭包上
 LUAI_FUNC void luaC_barrierproto_ (lua_State *L, Proto *p, Closure *c) {
   global_State *g = G(L);
   lua_assert(isblack(obj2gco(p)));
@@ -1139,7 +1147,13 @@ static void generationalcollection (lua_State *L) {
   lua_assert(g->gcstate == GCSpropagate);
 }
 
-
+// g->gcstepmul 用于衡量内存分配的速度和GC速度
+// 如果g->gcstepmul = 400. 代表 400/STEPMULADJ = 2倍于内存分配的速度
+// 所谓的2倍于内存的速度是这样实现的，使debet = 实际的GCdebt的2倍，最终GC运行至debet<0
+// 采取GCdebt来衡量不无道理
+// GCdebt的增加是在申请内存的时候增加的
+// 每次step都会使得GCdebt < -GCSTEPSIZE,即100个短字符串的大小
+// GC的运行时机应该是和内存的申请相关的，而相关则体现在GCdebt中
 static void incstep (lua_State *L) {
   global_State *g = G(L);
   l_mem debt = g->GCdebt;
@@ -1164,6 +1178,7 @@ static void incstep (lua_State *L) {
 /*
 ** performs a basic GC step
 */
+// 单步运行GC
 void luaC_forcestep (lua_State *L) {
   global_State *g = G(L);
   int i;
@@ -1178,6 +1193,7 @@ void luaC_forcestep (lua_State *L) {
 /*
 ** performs a basic GC step only if collector is running
 */
+// 如果GC在运行中，单步运行GC
 void luaC_step (lua_State *L) {
   global_State *g = G(L);
   if (g->gcrunning) luaC_forcestep(L);

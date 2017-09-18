@@ -24,7 +24,18 @@
 ** is not being enforced (e.g., sweep phase).
 */
 
-
+// 垃圾回收GC
+// 增量型的标记扫描算法
+// lua使用了3种颜色来表示可回收对象的状态
+// 白色: 
+//      白色又分为两种，一种是current white，另外一种是other white
+//		分别代表没用没有标记到和不参与本轮GC的新增的对象
+// 灰色:
+// 		灰色代表当前对象标记了，但是它所引用的对象尚未标记
+// 黑色:
+// 		黑色代表当前对象和引用的对象都标记了
+// 
+// 这个标记过程中的不变量是白色的对象不会指向黑色对象
 
 /* how much to allocate before next GC step */
 #if !defined(GCSTEPSIZE)
@@ -36,17 +47,18 @@
 /*
 ** Possible states of the Garbage Collector
 */
-#define GCSpropagate	0
-#define GCSatomic	1
-#define GCSsweepstring	2
-#define GCSsweepudata	3
-#define GCSsweep	4
-#define GCSpause	5
+// GC过程中的可能状态
+#define GCSpropagate	0 	// GC在增量标记中
+#define GCSatomic	1		// GC在一致性标记中
+#define GCSsweepstring	2	// GC在扫描字符串中
+#define GCSsweepudata	3	// GC在扫描userdata中
+#define GCSsweep	4		// GC在增量扫描中
+#define GCSpause	5		// GC结束，待开始
 
-
+// GC是否在扫描阶段
 #define issweepphase(g)  \
 	(GCSsweepstring <= (g)->gcstate && (g)->gcstate <= GCSsweep)
-
+// GC是分代式的
 #define isgenerational(g)	((g)->gckind == KGC_GEN)
 
 /*
@@ -57,7 +69,9 @@
 ** all objects are white again. During a generational collection, the
 ** invariant must be kept all times.
 */
-
+// GC不变量是否成立
+// 当GC是增量型标记扫描时，只有在标记阶段成立，而扫描阶段会打破这规则
+// 而GC是分代式的时候，不变量恒成立
 #define keepinvariant(g)	(isgenerational(g) || g->gcstate <= GCSatomic)
 
 
@@ -65,6 +79,7 @@
 ** Outside the collector, the state in generational mode is kept in
 ** 'propagate', so 'keepinvariant' is always true.
 */
+// GC不变量是否不成立
 #define keepinvariantout(g)  \
   check_exp(g->gcstate == GCSpropagate || !isgenerational(g),  \
             g->gcstate <= GCSatomic)
@@ -82,7 +97,7 @@
 #define resetbit(x,b)		resetbits(x, bitmask(b))
 #define testbit(x,b)		testbits(x, bitmask(b))
 
-
+// GC对象marked的各个位表示
 /* Layout for bit use in `marked' field: */
 #define WHITE0BIT	0  /* object is white (type 0) */
 #define WHITE1BIT	1  /* object is white (type 1) */
@@ -95,9 +110,9 @@
 
 #define WHITEBITS	bit2mask(WHITE0BIT, WHITE1BIT)
 
-
 #define iswhite(x)      testbits((x)->gch.marked, WHITEBITS)
 #define isblack(x)      testbit((x)->gch.marked, BLACKBIT)
+// 白色黑色都没标记就代表灰色
 #define isgray(x)  /* neither white nor black */  \
 	(!testbits((x)->gch.marked, WHITEBITS | bitmask(BLACKBIT)))
 
@@ -105,8 +120,9 @@
 
 /* MOVE OLD rule: whenever an object is moved to the beginning of
    a GC list, its old bit must be cleared */
+// 每当对象被重新放回gc链的开头时，old标志位就重置
 #define resetoldbit(o)	resetbit((o)->gch.marked, OLDBIT)
-
+// 其它白色并非dead，currentwhite才是
 #define otherwhite(g)	(g->currentwhite ^ WHITEBITS)
 #define isdeadm(ow,m)	(!(((m) ^ WHITEBITS) & (ow)))
 #define isdead(g,v)	isdeadm(otherwhite(g), (v)->gch.marked)
@@ -118,12 +134,12 @@
 
 #define luaC_white(g)	cast(lu_byte, (g)->currentwhite & WHITEBITS)
 
-
 #define luaC_condGC(L,c) \
 	{if (G(L)->GCdebt > 0) {c;}; condchangemem(L);}
+// 在适当的时候驱动GC一步步运行
 #define luaC_checkGC(L)		luaC_condGC(L, luaC_step(L);)
 
-
+// barrier分为前向和后向
 #define luaC_barrier(L,p,v) { if (valiswhite(v) && isblack(obj2gco(p)))  \
 	luaC_barrier_(L,obj2gco(p),gcvalue(v)); }
 
