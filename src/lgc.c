@@ -74,7 +74,7 @@
 
 #define markvalue(g,o) { checkconsistency(o); \
   if (valiswhite(o)) reallymarkobject(g,gcvalue(o)); }
-
+// markobject的iswhite是用来防止mark同一个object多次，因为mark完后就不为白色了
 #define markobject(g,t) { if ((t) && iswhite(obj2gco(t))) \
 		reallymarkobject(g, obj2gco(t)); }
 
@@ -252,16 +252,20 @@ GCObject *luaC_newobj (lua_State *L, int tt, size_t sz, GCObject **list,
 ** to appropriate list to be visited (and turned black) later. (Open
 ** upvalues are already linked in 'headuv' list.)
 */
+// 根据对象的类型来进行mark，主要是将白标黑或灰
 static void reallymarkobject (global_State *g, GCObject *o) {
   lu_mem size;
+  // 先标灰
   white2gray(o);
   switch (gch(o)->tt) {
+  	// 字符串没有引用，直接标黑
     case LUA_TSHRSTR:
     case LUA_TLNGSTR: {
       size = sizestring(gco2ts(o));
       break;  /* nothing else to mark; make it black */
     }
     case LUA_TUSERDATA: {
+	  // userdata标下metatable和env两个table
       Table *mt = gco2u(o)->metatable;
       markobject(g, mt);
       markobject(g, gco2u(o)->env);
@@ -269,6 +273,7 @@ static void reallymarkobject (global_State *g, GCObject *o) {
       break;
     }
     case LUA_TUPVAL: {
+	  // upvalue先mark一下指向的value，如果是open的，直接return，标灰不标黑
       UpVal *uv = gco2uv(o);
       markvalue(g, uv->v);
       if (uv->v != &uv->u.value)  /* open? */
@@ -276,6 +281,7 @@ static void reallymarkobject (global_State *g, GCObject *o) {
       size = sizeof(UpVal);
       break;
     }
+	// closure，table，thread，proto，连接gclist，标灰
     case LUA_TLCL: {
       gco2lcl(o)->gclist = g->gray;
       g->gray = o;
@@ -287,6 +293,7 @@ static void reallymarkobject (global_State *g, GCObject *o) {
       return;
     }
     case LUA_TTABLE: {
+	  // 将table的hash部分放到g->gray
       linktable(gco2t(o), &g->gray);
       return;
     }
@@ -302,6 +309,7 @@ static void reallymarkobject (global_State *g, GCObject *o) {
     }
     default: lua_assert(0); return;
   }
+  // 标黑
   gray2black(o);
   g->GCmemtrav += size;
 }
@@ -310,6 +318,7 @@ static void reallymarkobject (global_State *g, GCObject *o) {
 /*
 ** mark metamethods for basic types
 */
+// 标记基本类型的metatable
 static void markmt (global_State *g) {
   int i;
   for (i=0; i < LUA_NUMTAGS; i++)
@@ -320,6 +329,7 @@ static void markmt (global_State *g) {
 /*
 ** mark all objects in list of being-finalized
 */
+// 标记正在finalizing的对象
 static void markbeingfnz (global_State *g) {
   GCObject *o;
   for (o = g->tobefnz; o != NULL; o = gch(o)->next) {
@@ -333,6 +343,7 @@ static void markbeingfnz (global_State *g) {
 ** mark all values stored in marked open upvalues. (See comment in
 ** 'lstate.h'.)
 */
+// 标记所有open upvalue指向的value
 static void remarkupvals (global_State *g) {
   UpVal *uv;
   for (uv = g->uvhead.u.l.next; uv != &g->uvhead; uv = uv->u.l.next) {
@@ -346,6 +357,8 @@ static void remarkupvals (global_State *g) {
 ** mark root set and reset all gray lists, to start a new
 ** incremental (or full) collection
 */
+// 标记root集合
+// 主线程，注册表，元表，上一轮正在finalizing的对象
 static void restartcollection (global_State *g) {
   g->gray = g->grayagain = NULL;
   g->weak = g->allweak = g->ephemeron = NULL;
@@ -424,7 +437,7 @@ static int traverseephemeron (global_State *g, Table *h) {
   return marked;
 }
 
-
+// 遍历整个table，mark数组和哈希部分
 static void traversestrongtable (global_State *g, Table *h) {
   Node *n, *limit = gnodelast(h);
   int i;
@@ -442,7 +455,8 @@ static void traversestrongtable (global_State *g, Table *h) {
   }
 }
 
-
+// 处理在gray链表中的table
+// 先markmetatable，再根据weak table来分别处理
 static lu_mem traversetable (global_State *g, Table *h) {
   const char *weakkey, *weakvalue;
   const TValue *mode = gfasttm(g, h->metatable, TM_MODE);
@@ -465,7 +479,7 @@ static lu_mem traversetable (global_State *g, Table *h) {
                          sizeof(Node) * cast(size_t, sizenode(h));
 }
 
-
+// 遍历proto，mark源代码，literals常量，upvalue的名字，局部变量的名字
 static int traverseproto (global_State *g, Proto *f) {
   int i;
   if (f->cache && iswhite(obj2gco(f->cache)))
@@ -487,7 +501,7 @@ static int traverseproto (global_State *g, Proto *f) {
                          sizeof(Upvaldesc) * f->sizeupvalues;
 }
 
-
+// 遍历c-closure.upvalues
 static lu_mem traverseCclosure (global_State *g, CClosure *cl) {
   int i;
   for (i = 0; i < cl->nupvalues; i++)  /* mark its upvalues */
@@ -495,6 +509,7 @@ static lu_mem traverseCclosure (global_State *g, CClosure *cl) {
   return sizeCclosure(cl->nupvalues);
 }
 
+// 遍历lua-closure，其中的proto，还有upvalues
 static lu_mem traverseLclosure (global_State *g, LClosure *cl) {
   int i;
   markobject(g, cl->p);  /* mark its prototype */
@@ -503,7 +518,7 @@ static lu_mem traverseLclosure (global_State *g, LClosure *cl) {
   return sizeLclosure(cl->nupvalues);
 }
 
-
+// 遍历一个线程的stack，mark其中的value
 static lu_mem traversestack (global_State *g, lua_State *th) {
   int n = 0;
   StkId o = th->stack;
@@ -530,6 +545,9 @@ static lu_mem traversestack (global_State *g, lua_State *th) {
 ** traverse one gray object, turning it to black (except for threads,
 ** which are always gray).
 */
+// 遍历一个灰色的对象，标黑，除了线程会一直保持灰色
+// 从这里可以看到，一次真的只是遍历一个对象，所以外层控制GC的并发率的时候，
+// 是通过扫描的内存量来控制的,也就是以一轮propagate可能会调这个函数多次
 static void propagatemark (global_State *g) {
   lu_mem size;
   GCObject *o = g->gray;
@@ -555,6 +573,7 @@ static void propagatemark (global_State *g) {
       break;
     }
     case LUA_TTHREAD: {
+	  // 将线程从gray中移动到grayagain中
       lua_State *th = gco2th(o);
       g->gray = th->gclist;  /* remove from 'gray' list */
       th->gclist = g->grayagain;
@@ -574,12 +593,12 @@ static void propagatemark (global_State *g) {
   g->GCmemtrav += size;
 }
 
-
+// 全量mark
 static void propagateall (global_State *g) {
   while (g->gray) propagatemark(g);
 }
 
-
+// 复用propagateall的逻辑，将要propagate的链表换到g->gray上
 static void propagatelist (global_State *g, GCObject *l) {
   lua_assert(g->gray == NULL);  /* no grays left */
   g->gray = l;
@@ -591,6 +610,7 @@ static void propagatelist (global_State *g, GCObject *l) {
 ** lists when traversed, traverse the original lists to avoid traversing
 ** twice the same table (which is not wrong, but inefficient)
 */
+// 遍历所有的灰色链表
 static void retraversegrays (global_State *g) {
   GCObject *weak = g->weak;  /* save original lists */
   GCObject *grayagain = g->grayagain;
@@ -602,7 +622,7 @@ static void retraversegrays (global_State *g) {
   propagatelist(g, ephemeron);
 }
 
-
+// 使得ephemeron链表传播收敛
 static void convergeephemerons (global_State *g) {
   int changed;
   do {
@@ -1007,7 +1027,8 @@ void luaC_freeallobjects (lua_State *L) {
   lua_assert(g->strt.nuse == 0);
 }
 
-
+// 最后的标记阶段，保证一致性
+// 处理weak-table，finalizer，比较复杂
 static l_mem atomic (lua_State *L) {
   global_State *g = G(L);
   l_mem work = -cast(l_mem, g->GCmemtrav);  /* start counting work */
@@ -1048,7 +1069,8 @@ static l_mem atomic (lua_State *L) {
   return work;  /* estimate of memory marked by 'atomic' */
 }
 
-
+// 根据G(L)的GC状态来选择下一步GC的方法
+// 一直轮转
 static lu_mem singlestep (lua_State *L) {
   global_State *g = G(L);
   switch (g->gcstate) {
@@ -1206,6 +1228,7 @@ void luaC_step (lua_State *L) {
 ** performs a full GC cycle; if "isemergency", does not call
 ** finalizers (which could change stack positions)
 */
+// 执行一次全量GC
 void luaC_fullgc (lua_State *L, int isemergency) {
   global_State *g = G(L);
   int origkind = g->gckind;

@@ -1026,7 +1026,8 @@ LUA_API int lua_status (lua_State *L) {
 /*
 ** Garbage-collection function
 */
-
+// lua暴露到外部的垃圾回收api
+// 包括启动，停止，信息统计，改变参数，改变模式，单步执行，全量执行等
 LUA_API int lua_gc (lua_State *L, int what, int data) {
   int res = 0;
   global_State *g;

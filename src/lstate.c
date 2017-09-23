@@ -104,6 +104,7 @@ static unsigned int makeseed (lua_State *L) {
 ** set GCdebt to a new value keeping the value (totalbytes + GCdebt)
 ** invariant
 */
+// ÖØÐÂÉèÖÃGCdebt
 void luaE_setdebt (global_State *g, l_mem debt) {
   g->totalbytes -= (debt - g->GCdebt);
   g->GCdebt = debt;
