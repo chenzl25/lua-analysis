@@ -118,6 +118,8 @@ static void removeentry (Node *n) {
 ** other objects: if really collected, cannot keep them; for objects
 ** being finalized, keep them in keys, but not in values
 */
+// 对于weak-table，非可回收对象是不能被weak-table清除的，还有string也是值语义的，所以不回收
+// 所以只有白色的对象需要回收
 static int iscleared (global_State *g, const TValue *o) {
   if (!iscollectable(o)) return 0;
   else if (ttisstring(o)) {
@@ -376,7 +378,7 @@ static void restartcollection (global_State *g) {
 ** Traverse functions
 ** =======================================================
 */
-
+// 检查weakvalue-table，如果一定需要clear，那么放入g->weak，否则放入g->grayagain
 static void traverseweakvalue (global_State *g, Table *h) {
   Node *n, *limit = gnodelast(h);
   /* if there is array part, assume it may have white values (do not
@@ -399,7 +401,7 @@ static void traverseweakvalue (global_State *g, Table *h) {
     linktable(h, &g->grayagain);  /* no need to clean */
 }
 
-
+// 检查weakkey-table，
 static int traverseephemeron (global_State *g, Table *h) {
   int marked = 0;  /* true if an object is marked in this traversal */
   int hasclears = 0;  /* true if table has white keys */
@@ -623,6 +625,9 @@ static void retraversegrays (global_State *g) {
 }
 
 // 使得ephemeron链表传播收敛
+// 即是weak-key中white key -> white value 其中的weak-key有待被确认是否会标黑
+// 如果white key被标黑，则对应的white value也需要被reallymark，从而导致需要propagateall
+// 所以这个函数的目的是迭代到weak-table没有mark到新的变化，也即是收敛
 static void convergeephemerons (global_State *g) {
   int changed;
   do {
