@@ -104,6 +104,7 @@ static void reallymarkobject (global_State *g, GCObject *o);
 ** if key is not marked, mark its entry as dead (therefore removing it
 ** from the table)
 */
+// Èç¹ûkeyÊÇ°×É«µÄ£¬ÄÇÃ´ÉèÎªdead
 static void removeentry (Node *n) {
   lua_assert(ttisnil(gval(n)));
   if (valiswhite(gkey(n)))
@@ -659,6 +660,7 @@ static void convergeephemerons (global_State *g) {
 ** clear entries with unmarked keys from all weaktables in list 'l' up
 ** to element 'f'
 */
+// Çå³ıweak-key-tableÖĞµÄÃ»±ê¼ÇµÄ(ÒÀ¾ÉÊÇ°×É«µÄ)key
 static void clearkeys (global_State *g, GCObject *l, GCObject *f) {
   for (; l != f; l = gco2t(l)->gclist) {
     Table *h = gco2t(l);
@@ -677,6 +679,7 @@ static void clearkeys (global_State *g, GCObject *l, GCObject *f) {
 ** clear entries with unmarked values from all weaktables in list 'l' up
 ** to element 'f'
 */
+// Çå³ıweak-value-tableÖĞµÄÃ»±ê¼ÇµÄ(ÒÀ¾ÉÊÇ°×É«µÄ)value
 static void clearvalues (global_State *g, GCObject *l, GCObject *f) {
   for (; l != f; l = gco2t(l)->gclist) {
     Table *h = gco2t(l);
@@ -732,6 +735,7 @@ static GCObject **sweeplist (lua_State *L, GCObject **p, lu_mem count);
 ** sweep the (open) upvalues of a thread and resize its stack and
 ** list of call-info structures.
 */
+// É¨ÃèÏß³Ì£¬É¨Ïß³ÌµÄopenupvalºÍÇå³ı¶àÓàµÄCallInfo
 static void sweepthread (lua_State *L, lua_State *L1) {
   if (L1->stack == NULL) return;  /* stack not completely built yet */
   sweepwholelist(L, &L1->openupval);  /* sweep open upvalues */
@@ -753,6 +757,7 @@ static void sweepthread (lua_State *L, lua_State *L1) {
 ** one will be old too.
 ** When object is a thread, sweep its list of open upvalues too.
 */
+// ÓÃÓÚÔöÁ¿Ê½É¨ÃèµÄÍ¨ÓÃº¯Êı£¬×î¶àÉ¨Ãècount¸ö
 static GCObject **sweeplist (lua_State *L, GCObject **p, lu_mem count) {
   global_State *g = G(L);
   int ow = otherwhite(g);
@@ -842,7 +847,7 @@ static void dothecall (lua_State *L, void *ud) {
   luaD_call(L, L->top - 2, 0, 0);
 }
 
-
+// finalizeÒ»¸ö¶ÔÏó
 static void GCTM (lua_State *L, int propagateerrors) {
   global_State *g = G(L);
   const TValue *tm;
@@ -907,6 +912,7 @@ static void separatetobefnz (lua_State *L, int all) {
 ** if object 'o' has a finalizer, remove it from 'allgc' list (must
 ** search the list to find it) and link it in 'finobj' list.
 */
+// ½«ÉèÖÃÁËfinalizerµÄ¶ÔÏó´Óg->allgcÅ²µ½g->finobj
 void luaC_checkfinalizer (lua_State *L, GCObject *o, Table *mt) {
   global_State *g = G(L);
   if (testbit(gch(o)->marked, SEPARATED) || /* obj. is already separated... */
@@ -970,6 +976,7 @@ static void setpause (global_State *g, l_mem estimate) {
 ** of the real sweep.
 ** Returns how many objects it swept.
 */
+// ½øÈëÉ¨ÃèÄ£Ê½
 static int entersweep (lua_State *L) {
   global_State *g = G(L);
   int n = 0;
@@ -1031,7 +1038,7 @@ void luaC_freeallobjects (lua_State *L) {
     sweepwholelist(L, &g->strt.hash[i]);
   lua_assert(g->strt.nuse == 0);
 }
-
+#include <stdio.h>
 // ×îºóµÄ±ê¼Ç½×¶Î£¬±£Ö¤Ò»ÖÂĞÔ
 // ´¦Àíweak-table£¬finalizer£¬±È½Ï¸´ÔÓ
 static l_mem atomic (lua_State *L) {
@@ -1039,34 +1046,54 @@ static l_mem atomic (lua_State *L) {
   l_mem work = -cast(l_mem, g->GCmemtrav);  /* start counting work */
   GCObject *origweak, *origall;
   lua_assert(!iswhite(obj2gco(g->mainthread)));
+  // ÖØĞÂmarkÒ»´ÎÏß³Ì£¬ÒòÎªËüÒ»Ö±±£³Ö×Å»ÒÉ«
   markobject(g, L);  /* mark running thread */
   /* registry and global metatables may be changed by API */
+  // ×¢²á±íºÍ»ù±¾ÀàĞÍÔª±í¿ÉÄÜ»á±»ÉÏµÛĞŞ¸Ä£¬ËùÒÔĞèÒªÔÙmarkÔ¤·ÀÏÂ
   markvalue(g, &g->l_registry);
   markmt(g);  /* mark basic metatables */
   /* remark occasional upvalues of (maybe) dead threads */
+  // ±ê¼ÇÏÂgµÄËùÓĞupvalueËùÖ¸ÏòµÄvalue
   remarkupvals(g);
+  // ½«ÉÏÃæËùÓĞÖØĞÂmarkµ½grayµÄ¶¼propagateµ½Ã»ÎªÖ¹
   propagateall(g);  /* propagate changes */
   work += g->GCmemtrav;  /* stop counting (do not (re)count grays) */
   /* traverse objects caught by write barrier and by 'remarkupvals' */
+  // ½«»ÒÉ«Á´¶¼ÖØĞÂmarkÒ»±é
   retraversegrays(g);
   work -= g->GCmemtrav;  /* restart counting */
+  // ½«weak-key±íµü´úµ½ÊÕÁ²ÎªÖ¹£¬ÒòÎªËü¿ÉÄÜ»áÁ¬»·¹ØÁªa->b, b->c, c->d
   convergeephemerons(g);
   /* at this point, all strongly accessible objects are marked. */
   /* clear values from weak tables, before checking finalizers */
+  // ÏÖÔÚËùÓĞÇ¿¿É´ïµÄ¶ÔÏó¶¼±ê¼ÇÍêÁË£¬½Ó×ÅÇå³ıweak-valueÀàµÄtable
+  // ¶øweak-keyµÄ»¹Ã»Çå£¬ÒòÎªfinalizer¿ÉÄÜ»áµ¼ÖÂÆä¸´»îÒ»Õó×Ó¼
+  // ¼ûhttp://www.cnblogs.com/JesseFang/archive/2012/12/27/2836160.html
   clearvalues(g, g->weak, NULL);
   clearvalues(g, g->allweak, NULL);
   origweak = g->weak; origall = g->allweak;
   work += g->GCmemtrav;  /* stop counting (objects being finalized) */
+  // ·ÖÀë³öfinalizer´Óg->finobjµ½g->tobefnz
   separatetobefnz(L, 0);  /* separate objects to be finalized */
+  // ±¾À´g->tobefnzÖĞµÄ¶ÔÏóÓĞĞ©¶ÔÏó¿ÉÄÜÒÑ¾­ËÀÁË(°×É«)£¬µ«ÕâÀï»áÖØĞÂ±ê¼ÇËüÃÇ
+  // ÎªÁËÈÃweak-key±íÖĞµÄweak-key(½«Òª±»finalizeµÄ¶ÔÏó)ÄÜ¹»ÔÙ´Î·ÃÎÊµ½Æävalue
   markbeingfnz(g);  /* mark objects that will be finalized */
+  // ½«ÉÏÃæÖØĞÂ±ê»ÒµÄ¶ÔÏó¼ÌĞøpropagateµ½¿ÕÎªÖ¹
   propagateall(g);  /* remark, to propagate `preserveness' */
   work -= g->GCmemtrav;  /* restart counting */
+  // ½«weak-key±íµü´úµ½ÊÕÁ²ÎªÖ¹£¬¿ÉÄÜfinalizer»áÈÃÆäÖĞµÄÒ»Ğ©weak-key->valueÖØÉú
   convergeephemerons(g);
   /* at this point, all resurrected objects are marked. */
   /* remove dead objects from weak tables */
+  // µ½ÏÖÔÚËùÓĞ¿ÉÒÔÖØÉúµÄ¶ÔÏñÒ²ÒÑ¾­±»±ê¼ÇÁË£¬¿ÉÒÔÉ¾³ı¶ÔÓ¦µÄÎ´±ê¼Çweak-key
   clearkeys(g, g->ephemeron, NULL);  /* clear keys from all ephemeron tables */
   clearkeys(g, g->allweak, NULL);  /* clear keys from all allweak tables */
   /* clear values from resurrected weak tables */
+  // Çå³ıÓĞ¹ıÖØÉú±íµÄvalue
+  // ÒòÎªfinalizerµÄ¶ÔÏóobj¿ÉÄÜ»áÒıÓÃÁËÈõ±í£¬¶øÕâ¸öÈõ±í¿ÉÄÜÒòÎªobjµÄ´¦Àí¶ø¸´»î
+  // ¸´»îºóĞèÒª½øĞĞvalueµÄÇåÀí
+  printf("-> %p, %p\n", g->weak, origweak);
+  printf("-> %p, %p\n", g->allweak, origall);
   clearvalues(g, g->weak, origweak);
   clearvalues(g, g->allweak, origall);
   g->currentwhite = cast_byte(otherwhite(g));  /* flip current white */
@@ -1105,6 +1132,7 @@ static lu_mem singlestep (lua_State *L) {
       }
     }
     case GCSsweepstring: {
+	  // ÔöÁ¿Ê½É¨Ãè×Ö·û´®³Ø£¬°´³ØµÄ¹şÏ£±íÏÂ±êÊıÄ¿¼ÆËã
       int i;
       for (i = 0; i < GCSWEEPMAX && g->sweepstrgc + i < g->strt.size; i++)
         sweepwholelist(L, &g->strt.hash[g->sweepstrgc + i]);
@@ -1114,6 +1142,7 @@ static lu_mem singlestep (lua_State *L) {
       return i * GCSWEEPCOST;
     }
     case GCSsweepudata: {
+	  // É¨Ãèudata
       if (g->sweepfin) {
         g->sweepfin = sweeplist(L, g->sweepfin, GCSWEEPMAX);
         return GCSWEEPMAX*GCSWEEPCOST;
