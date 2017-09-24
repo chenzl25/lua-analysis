@@ -1092,8 +1092,6 @@ static l_mem atomic (lua_State *L) {
   // 清除有过重生表的value
   // 因为finalizer的对象obj可能会引用了弱表，而这个弱表可能因为obj的处理而复活
   // 复活后需要进行value的清理
-  printf("-> %p, %p\n", g->weak, origweak);
-  printf("-> %p, %p\n", g->allweak, origall);
   clearvalues(g, g->weak, origweak);
   clearvalues(g, g->allweak, origall);
   g->currentwhite = cast_byte(otherwhite(g));  /* flip current white */
